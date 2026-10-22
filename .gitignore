@@ -1,9 +1,7 @@
-ifcompiler
-ifcompiler.exe
-*.exe
-*.o
-parser.tab.c
-parser.tab.h
-lex.yy.c
-*.output
+__pycache__/
+*.pyc
+venv/
+.venv/
+.env
 .vscode/
+

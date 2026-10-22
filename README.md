@@ -1,195 +1,56 @@
-# Conditional Statement Compiler Front End
+# Conditional Statement Compiler — Python + Web UI
 
-A Compiler Design mini project that implements a **compiler front end for conditional statements** (`if`, `if-else`, `else if` and nested conditionals) using **C, Flex and Bison**.
-
-The compiler checks that conditions and statement blocks are written correctly. It does lexical, syntax and semantic analysis, then prints an **Abstract Syntax Tree (AST)**.
-
----
+This educational compiler front end is written in Python and uses Flask for its browser interface. The compiler logic is separated into three modules: `lexer.py`, `parser.py`, and `semantic.py`. `compiler.py` connects these modules to the existing web UI.
 
 ## Features
+- Lexical analysis with a numbered token list, token type, lexeme, line and column
+- Syntax parsing for declarations, assignments, braced blocks, and nested `if-else`
+- Grammar-style parse tree displayed with branches similar to a compiler derivation tree
+- Abstract Syntax Tree (AST)
+- Basic semantic checks for duplicate declarations and undeclared variables
+- Symbol table and status panels in the web UI
 
-- **Lexical analysis** (Flex): finds keywords, identifiers, numbers, relational operators and symbols. It reports invalid characters with their line numbers.
-- **Syntax analysis** (Bison): checks the grammar of
-  - simple `if`
-  - `if-else`
-  - `else if` ladders
-  - nested conditionals of any depth
-  - conditions of the form `expr RELOP expr`
-  - statement blocks `{ ... }`
-- **Semantic analysis**: uses a symbol table to catch
-  - undeclared variables
-  - duplicate declarations
-- **AST generation**: prints the program structure as an indented tree.
-- **Error reporting**: line-numbered messages, e.g. `Syntax error at line 2: syntax error, unexpected '{', expecting ')'`.
+## Files
+- `app.py` — Flask web application and compile endpoint
+- `templates/index.html` — existing user interface (unchanged)
+- `lexer.py` — token definitions and lexical analysis
+- `parser.py` — recursive-descent syntax parser, AST and parse-tree formatting
+- `semantic.py` — semantic checks and symbol-table management
+- `compiler.py` — coordinates the modules and returns the data expected by the UI
+- `requirements.txt` — Python dependency list
 
----
+## Run on Windows / VS Code
+1. Keep all Python files, `requirements.txt`, `README.md`, and the `templates` folder together in the same project folder.
+2. Open this project folder in VS Code.
+3. Open Terminal → New Terminal.
+4. Install Flask:
+   ```powershell
+   py -m pip install -r requirements.txt
+   ```
+5. Start the app:
+   ```powershell
+   py app.py
+   ```
+6. Open `http://127.0.0.1:5000` in your browser.
+7. Enter a program and click **Compile Program**. Use the existing tabs to view Result, Tokens, Parse Tree, AST, Semantic Report, and Symbol Table.
 
-## Supported Language
-
-```c
-int a;                 // declarations: int | float | char
-float f;
-a = 10;                // assignment: ID = ID | NUMBER | FLOAT ;
-if (a > 5) {           // relational ops: < > <= >= == !=
-    if (a != 7) {      // nested if
-        f = 1.5;
-    }
-} else if (a == 0) {   // else-if ladder
-    a = 1;
-} else {
-    a = 2;
-}
-```
-
----
-
-## Project Structure
-
-```
-CD_project/
-├── lexer.l              # Flex lexical analyzer
-├── parser.y             # Bison grammar, semantic checks, main()
-├── ast.h / ast.c        # AST node definition, printing, cleanup
-├── Makefile             # Build automation
-├── tests/
-│   ├── valid/           # Programs that must be accepted
-│   ├── invalid/         # Programs that must be rejected
-│   └── run_tests.sh     # Automated test runner
-├── docs/                # Architecture, grammar, report, viva questions
-├── presentation/        # Presentation outline
-└── screenshots/         # Output screenshots
-```
-
----
-
-## Requirements
-
-- GCC
-- Flex
-- Bison
-- Make (optional)
-
-**Ubuntu / WSL:** `sudo apt install gcc flex bison make`
-**Windows:** use MSYS2 (`pacman -S gcc flex bison make`) or WSL.
-
----
-
-## Build & Run
-
-```bash
-# Using make
-make
-./ifcompiler tests/valid/if_else.txt
-
-# Manual build
-bison -d parser.y
-flex lexer.l
-gcc -o ifcompiler parser.tab.c lex.yy.c ast.c
-
-# Read from stdin
-./ifcompiler < tests/valid/nested_if.txt
-```
-
-Run all tests:
-
-```bash
-make test
-```
-
----
-
-## Sample Output
-
-**Input** (`tests/valid/if_else.txt`):
-
+## Supported language example
 ```c
 int a;
 int b;
+a = 5;
 if (a > 10) {
-     b = 20;
+    if (b < 20) {
+        a = 6;
+    } else {
+        a = 7;
+    }
+} else {
+    b = 30;
 }
-else {
-b = 30;
-}
 ```
 
-**Output:**
+Supported declarations: `int a;`, `float b;`, `char c;`. Assignments support a single identifier or numeric value, for example `a = 5;` or `b = a;`. Conditions support a single identifier or number on each side of `<`, `>`, `<=`, `>=`, `==`, or `!=`. Braced blocks and nested `if-else` are supported.
 
-```
-Syntax analysis successful.
-Semantic analysis successful.
-Program is valid.
-
-Abstract Syntax Tree:
-Declaration: a
-Declaration: b
-IF
-  Condition: a > 10
-  Body
-    Block
-      Assignment: b
-        Expression: 20
-    ELSE
-      Block
-        Assignment: b
-          Expression: 30
-```
-
-**Invalid input** (`tests/invalid/missing_paren.txt`):
-
-```
-Syntax error at line 2: syntax error, unexpected '{', expecting RELOP or ')'
-```
-
-**Semantic error** (`tests/invalid/undeclared.txt`):
-
-```
-Semantic error: undeclared variable 'b'.
-Syntax analysis successful.
-Semantic analysis failed.
-Program is invalid.
-```
-
----
-
-## Exit Codes
-
-| Code | Meaning |
-|------|---------|
-| 0 | Valid program |
-| 1 | Lexical / syntax error |
-| 2 | Semantic error |
-
----
-
-## Grammar (summary)
-
-```
-Program     → StmtList
-StmtList    → Stmt StmtList | ε
-Stmt        → Declaration | Assignment | IfStmt | Block
-Declaration → TYPE ID ;
-Assignment  → ID = Expr ;
-IfStmt      → if ( Cond ) Block ElsePart
-ElsePart    → else Block | else IfStmt | ε
-Block       → { StmtList }
-Cond        → Expr RELOP Expr
-Expr        → ID | NUMBER | FLOATNUM
-```
-
-See [docs/cfg_and_grammar.md](docs/cfg_and_grammar.md) for full details.
-
----
-
-## Documentation
-
-- [Architecture](docs/architecture.md)
-- [CFG & Grammar](docs/cfg_and_grammar.md)
-- [Project Report](docs/project_report.md)
-- [Viva Questions](docs/viva_questions.md)
-
----
-
-## License
-
-This project is licensed under the [MIT License](LICENSE).
+## Current limitations
+Arithmetic expressions such as `a = b + 2;`, character literals, type compatibility checks, block-local scopes, and executing the input program are not implemented. The compiler parses the source and reports compiler-front-end information; it does not execute the source program.
