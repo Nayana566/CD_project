@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conditional Statement Compiler Front End</title>
+<meta name="description" content="Compiler front end that validates if, if-else and nested conditional statements: lexical, syntax and semantic analysis with parse tree and AST.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: hsl(232, 30%, 7%);
+    --panel: hsla(232, 30%, 14%, 0.65);
+    --border: hsla(240, 40%, 60%, 0.18);
+    --text: hsl(230, 25%, 92%);
+    --muted: hsl(230, 15%, 62%);
+    --accent: hsl(258, 90%, 66%);
+    --accent2: hsl(190, 90%, 55%);
+    --ok: hsl(150, 70%, 50%);
+    --fail: hsl(355, 85%, 62%);
+    --idle: hsl(40, 90%, 60%);
+    --mono: 'JetBrains Mono', Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Outfit', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    background-image:
+      radial-gradient(circle at 10% 0%, hsla(258, 90%, 50%, 0.25), transparent 45%),
+      radial-gradient(circle at 95% 100%, hsla(190, 90%, 45%, 0.18), transparent 45%);
+    background-attachment: fixed;
+  }
+  header { text-align: center; padding: 2.5rem 1rem 1.5rem; }
+  h1 {
+    font-size: clamp(1.6rem, 3.5vw, 2.5rem);
+    font-weight: 700;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  header p { color: var(--muted); margin-top: .5rem; }
+  main {
+    max-width: 1300px; margin: 0 auto; padding: 0 1.25rem 3rem;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;
+  }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    backdrop-filter: blur(14px);
+    padding: 1.25rem;
+    box-shadow: 0 10px 40px hsla(240, 60%, 3%, 0.5);
+    animation: rise .5s ease both;
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  .card h2 { font-size: 1.05rem; font-weight: 600; margin-bottom: .8rem; display: flex; justify-content: space-between; align-items: center; }
+  textarea {
+    width: 100%; min-height: 340px; resize: vertical;
+    background: hsla(232, 35%, 5%, 0.8); color: var(--text);
+    border: 1px solid var(--border); border-radius: 10px;
+    padding: 1rem; font-family: var(--mono); font-size: .92rem; line-height: 1.55;
+    tab-size: 4; outline: none; transition: border-color .2s, box-shadow .2s;
+  }
+  textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px hsla(258, 90%, 66%, 0.25); }
+  .row { display: flex; gap: .6rem; flex-wrap: wrap; margin-top: .9rem; }
+  button, select {
+    font-family: inherit; font-size: .95rem; border-radius: 10px; cursor: pointer;
+    border: 1px solid var(--border); padding: .65rem 1.1rem; color: var(--text);
+    background: hsla(232, 30%, 20%, 0.8); transition: transform .15s, box-shadow .2s, background .2s;
+  }
+  button:hover, select:hover { transform: translateY(-1px); background: hsla(232, 30%, 26%, 0.9); }
+  #compileBtn {
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border: none; font-weight: 600; color: #0b0b18;
+  }
+  #compileBtn:hover { box-shadow: 0 6px 24px hsla(258, 90%, 60%, 0.45); }
+  #compileBtn:disabled { opacity: .6; cursor: wait; }
+  .phases { display: grid; grid-template-columns: repeat(3, 1fr); gap: .7rem; margin-bottom: 1rem; }
+  .phase {
+    border: 1px solid var(--border); border-radius: 12px; padding: .75rem; text-align: center;
+    background: hsla(232, 35%, 8%, 0.6); transition: border-color .3s, background .3s;
+  }
+  .phase span { display: block; font-size: .8rem; color: var(--muted); }
+  .phase strong { font-size: 1rem; }
+  .phase.ok { border-color: var(--ok); background: hsla(150, 70%, 40%, 0.12); }
+  .phase.ok strong { color: var(--ok); }
+  .phase.fail { border-color: var(--fail); background: hsla(355, 85%, 50%, 0.12); }
+  .phase.fail strong { color: var(--fail); }
+  .phase.idle strong { color: var(--idle); }
+  .tabs { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: .7rem; }
+  .tab { padding: .45rem .85rem; font-size: .85rem; border-radius: 999px; background: transparent; }
+  .tab.active { background: linear-gradient(90deg, var(--accent), var(--accent2)); color: #0b0b18; border-color: transparent; font-weight: 600; }
+  pre {
+    background: hsla(232, 35%, 5%, 0.8); border: 1px solid var(--border); border-radius: 10px;
+    padding: 1rem; font-family: var(--mono); font-size: .86rem; line-height: 1.5;
+    min-height: 260px; max-height: 460px; overflow: auto; white-space: pre;
+  }
+  pre.error { color: var(--fail); }
+  .badge { font-size: .75rem; color: var(--muted); font-weight: 400; }
+  footer { text-align: center; color: var(--muted); font-size: .85rem; padding-bottom: 2rem; }
+  kbd { font-family: var(--mono); background: hsla(232,30%,22%,1); padding: .1rem .4rem; border-radius: 5px; font-size: .8rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Conditional Statement Compiler Front End</h1>
+  <p>Lexical, syntax and semantic analysis for <code>if</code>, <code>if-else</code> and nested conditionals</p>
+</header>
+
+<main>
+  <section class="card" aria-labelledby="srcTitle">
+    <h2 id="srcTitle">Source Code <span class="badge"><kbd>Ctrl</kbd> + <kbd>Enter</kbd> to compile</span></h2>
+    <textarea id="source" spellcheck="false" aria-label="Source code"></textarea>
+    <div class="row">
+      <button id="compileBtn">▶ Compile</button>
+      <select id="examples" aria-label="Load example">
+        <option value="">Load example…</option>
+        <option value="ifelse">if-else</option>
+        <option value="nested">Nested if</option>
+        <option value="syntax">Syntax error</option>
+        <option value="semantic">Semantic error</option>
+      </select>
+      <button id="clearBtn">Clear</button>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="resTitle">
+    <h2 id="resTitle">Analysis Results</h2>
+    <div class="phases">
+      <div class="phase" id="ph-lexical"><span>Lexical</span><strong>—</strong></div>
+      <div class="phase" id="ph-syntax"><span>Syntax</span><strong>—</strong></div>
+      <div class="phase" id="ph-semantic"><span>Semantic</span><strong>—</strong></div>
+    </div>
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-key="output" id="tab-output">Output</button>
+      <button class="tab" data-key="tokens" id="tab-tokens">Tokens</button>
+      <button class="tab" data-key="parse_tree" id="tab-parse">Parse Tree</button>
+      <button class="tab" data-key="ast" id="tab-ast">AST</button>
+      <button class="tab" data-key="symbol_table" id="tab-symbols">Symbol Table</button>
+    </div>
+    <pre id="result">Write a program and press Compile.</pre>
+  </section>
+</main>
+
+<footer>Compiler Design Mini Project</footer>
+
+<script>
+  const examples = {
+    ifelse: "int a;\nint b;\nif (a > 10) {\n    b = 20;\n} else {\n    b = 30;\n}\n",
+    nested: "int a;\nint b;\nif (a > 10) {\n    if (b != 0) {\n        b = 1;\n    } else {\n        b = 2;\n    }\n} else {\n    a = 5;\n}\n",
+    syntax: "int a;\nif (a > 10 {\n    a = 1;\n}\n",
+    semantic: "int a;\nif (a < b) {\n    a = 1;\n}\n"
+  };
+
+  const src = document.getElementById('source');
+  const result = document.getElementById('result');
+  const btn = document.getElementById('compileBtn');
+  let data = null;
+  let activeKey = 'output';
+
+  src.value = examples.nested;
+
+  function setPhase(name, value) {
+    const el = document.getElementById('ph-' + name);
+    const v = value || '—';
+    el.querySelector('strong').textContent = v;
+    el.className = 'phase ' + (v === 'Successful' ? 'ok' : v === 'Failed' ? 'fail' : v === '—' ? '' : 'idle');
+  }
+
+  function render() {
+    if (!data) return;
+    const text = data[activeKey];
+    result.textContent = text && text.length ? text : '(nothing to show for this stage)';
+    const failed = ['lexical', 'syntax', 'semantic'].some(k => data[k] === 'Failed') || data.error;
+    result.classList.toggle('error', activeKey === 'output' && !!failed);
+  }
+
+  async function compile() {
+    btn.disabled = true;
+    btn.textContent = 'Compiling…';
+    try {
+      const res = await fetch('/compile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: src.value })
+      });
+      data = await res.json();
+      if (data.error) data.output = data.error;
+    } catch (e) {
+      data = { output: 'Could not reach the server: ' + e.message, error: true };
+    }
+    setPhase('lexical', data.lexical);
+    setPhase('syntax', data.syntax);
+    setPhase('semantic', data.semantic);
+    render();
+    btn.disabled = false;
+    btn.textContent = '▶ Compile';
+  }
+
+  btn.addEventListener('click', compile);
+  src.addEventListener('keydown', e => {
+    if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); compile(); }
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const s = src.selectionStart;
+      src.value = src.value.slice(0, s) + '    ' + src.value.slice(src.selectionEnd);
+      src.selectionStart = src.selectionEnd = s + 4;
+    }
+  });
+  document.getElementById('examples').addEventListener('change', e => {
+    if (examples[e.target.value]) src.value = examples[e.target.value];
+    e.target.value = '';
+  });
+  document.getElementById('clearBtn').addEventListener('click', () => { src.value = ''; src.focus(); });
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    activeKey = t.dataset.key;
+    render();
+  }));
+</script>
+</body>
+</html>
